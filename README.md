@@ -191,3 +191,4 @@ curl -X POST http://127.0.0.1:8000/task/ -H 'accept: application/json' -H 'Conte
 * https://alembic.sqlalchemy.org/en/latest/autogenerate.html
 * https://towardsdatascience.com/build-an-async-python-service-with-fastapi-sqlalchemy-196d8792fa08
 * https://hackernoon.com/how-to-set-up-fastapi-ormar-and-alembic
+* https://github.com/tiangolo/uvicorn-gunicorn-fastapi-docker
