@@ -63,18 +63,28 @@ class TaskCreate(TaskBase):
 ### Step 3: Create settings related to DB in `db.py`
 
 ```python
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import SQLModel
+
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+
+
 sqlite_file_name = "database.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
+sqlite_url = f"sqlite+aiosqlite:///{sqlite_file_name}"
 
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, echo=True, connect_args=connect_args)
+engine = create_async_engine(sqlite_url, echo=True, future=True)
 
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
 
-def get_session():
-    with Session(engine) as session:
+async def init_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+
+
+async def get_session() -> AsyncSession:
+    async_session = sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with async_session() as session:
         yield session
 ```
 
@@ -82,28 +92,32 @@ def get_session():
 
 ```python
 from fastapi import FastAPI, Depends
-from sqlmodel import Session
-from app.db import create_db_and_tables, get_session
+from sqlalchemy.ext.asyncio import AsyncSession # this is new line
+from app.db import init_db, get_session # init_db is a new function
 from app.models import Task, TaskCreate
+
+# Changes all the function has been changed to async
+# session has been changed to AsyncSession
 
 app = FastAPI()
 
 @app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
+async def on_startup():
+    await init_db()
 
 @app.get("/ping")
-def pong():
+async def pong():
     return {"ping": "pong!"}
 
 @app.post("/task/", response_model=Task)
-def create_task(task: TaskCreate, session: Session = Depends(get_session)):
-    db_task = Task.from_orm(task)
-    session.add(db_task)
-    session.commit()
-    session.refresh(db_task)
-    return db_task
+async def create_task(task: TaskCreate, session: AsyncSession = Depends(get_session)):
+    task = Task(task_name=task.task_name)
+    session.add(task)
+    await session.commit()
+    await session.refresh(task)
+    return task
 ```
+
 ### Step 5: Test API endpoints
 
 
